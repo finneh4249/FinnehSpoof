@@ -51,7 +51,7 @@ public class RelationshipDatabase {
                     "type_a TEXT NOT NULL," +
                     "type_b TEXT NOT NULL," +
                     "sentiment REAL DEFAULT 0.0," +
-                    "interaction_count INTEGER DEFAULT 0," +
+                    "interaction_count REAL DEFAULT 0.0," +
                     "last_interaction TIMESTAMP," +
                     "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP," +
                     "UNIQUE(entity_a, entity_b)" +
@@ -157,7 +157,7 @@ public class RelationshipDatabase {
                 stmt.setString(2, pair[1]);
                 stmt.setString(3, tA);
                 stmt.setString(4, tB);
-                stmt.setInt(5, (int) Math.ceil(weight));
+                stmt.setDouble(5, weight);
                 stmt.executeUpdate();
                 try (ResultSet keys = stmt.getGeneratedKeys()) {
                     if (keys.next()) {
@@ -209,7 +209,7 @@ public class RelationshipDatabase {
                             rs.getString("type_a"),
                             rs.getString("type_b"),
                             rs.getDouble("sentiment"),
-                            rs.getInt("interaction_count"),
+                            rs.getDouble("interaction_count"),
                             rs.getString("last_interaction")
                         ));
                     }
@@ -222,7 +222,7 @@ public class RelationshipDatabase {
     /**
      * Gets the interaction count between two entities (normalized pair).
      */
-    public int getInteractionCount(String entityA, String entityB) throws SQLException {
+    public double getInteractionCount(String entityA, String entityB) throws SQLException {
         String[] pair = normalizePair(entityA, entityB);
         synchronized (dbLock) {
             try (PreparedStatement stmt = connection.prepareStatement(
@@ -232,12 +232,12 @@ public class RelationshipDatabase {
                 stmt.setString(2, pair[1]);
                 try (ResultSet rs = stmt.executeQuery()) {
                     if (rs.next()) {
-                        return rs.getInt("interaction_count");
+                        return rs.getDouble("interaction_count");
                     }
                 }
             }
         }
-        return 0;
+        return 0.0;
     }
 
     // ── Topics ───────────────────────────────────────────────────────────
@@ -408,7 +408,7 @@ public class RelationshipDatabase {
         synchronized (dbLock) {
             // Decay interaction counts for stale relationships
             try (PreparedStatement stmt = connection.prepareStatement(
-                "UPDATE relationships SET interaction_count = CAST(interaction_count * (1.0 - ?) AS INTEGER) " +
+                "UPDATE relationships SET interaction_count = interaction_count * (1.0 - ?) " +
                     "WHERE last_interaction < datetime('now', '-' || ? || ' days')"
             )) {
                 stmt.setDouble(1, decayRate);
@@ -470,7 +470,7 @@ public class RelationshipDatabase {
         String typeA,
         String typeB,
         double sentiment,
-        int interactionCount,
+        double interactionCount,
         String lastInteraction
     ) {
         /**
