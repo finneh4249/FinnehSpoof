@@ -1,0 +1,24 @@
+# Typo simulation configuration
+
+typo-simulation:
+  enabled: true
+  chance: 0.08
+  t-prefix-chance: 0.01
+  replacements:
+    "the": ["teh", "th"]
+    "you": ["u", "yo"]
+    "your": ["ur", "yor"]
+    "what": ["wut", "wat"]
+    "that": ["tht", "dat"]
+    "don't": ["dont", "dnt"]
+    "can't": ["cant"]
+    "because": ["cuz", "bc"]
+    "probably": ["prolly", "prob"]
+    "something": ["smth"]
+    "someone": ["sm1"]
+    "really": ["rly", "rlly"]
+    "people": ["ppl"]
+    "about": ["abt", "bout"]
+    "though": ["tho"]
+    "through": ["thru"]
+    "going": ["goin", "gonna"]

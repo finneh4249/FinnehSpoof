@@ -1,0 +1,83 @@
+# Chat behavior configuration
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CONVERSATION SEEDER - Prevents dead air and topic loops
+# ═══════════════════════════════════════════════════════════════════════════════
+conversation-seeder:
+  enabled: true
+  # How long before seeder fires (seconds)
+  idle-threshold-seconds: 300
+  # Chance of seeder firing per tick when idle
+  seed-chance: 0.3
+  # Topic summarization
+  summarize-every-messages: 50
+  summarize-every-minutes: 30
+  summary-context-lines: 50
+  max-exhausted-topics: 10
+  # Heat boost after seed
+  seed-heat-boost: 0.4
+
+# Chat ebb/flow tuning
+chat_base_chance: 0.15
+chat_max_chance: 0.75
+chat_heat_decay: 0.08
+chat_heat_human_increase: 0.45
+chat_heat_bot_decrease: 0.08
+
+# When no humans are online, scale chat chance by this multiplier
+chat_dead_server_multiplier: 0.05
+
+# Bot response cooldown to avoid pile-ons (seconds)
+bot_response_cooldown_seconds: 30
+
+# Chat typing delays (in ticks, 20 ticks = 1 second)
+chat_typing_base_delay: 40        # Initial delay before message appears (2 seconds)
+chat_typing_ticks_per_char: 4     # Ticks per character (~5 chars/sec typing speed)
+chat_typing_variation: 20         # Random variation in ticks (+/- 1 second)
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TRIGGER SYSTEM - Control when bots respond to chat
+# ═══════════════════════════════════════════════════════════════════════════════
+trigger:
+  # Mode: 'all' = respond to any message, 'mention' = only when bot is mentioned, 'keyword' = only when keywords match
+  mode: all
+  # Keywords that trigger responses (only used if mode is 'keyword' or 'all')
+  keywords:
+    - "anyone"
+    - "someone"
+    - "everybody"
+    - "guys"
+    - "yall"
+    - "y'all"
+  # Messages containing these words will never trigger a response
+  blacklist-words:
+    - "spam"
+    - "hack"
+    - "cheat"
+    - "exploit"
+
+# Deep thinking - extra boost when a human just spoke
+deep-thinking:
+  enabled: true
+  # Consider a human "recent" for this many seconds
+  recent-human-seconds: 30
+  context-boost: |
+    A REAL HUMAN is talking to you. Think about what they actually want.
+    - If they ask a question, answer it directly and briefly
+    - If they're chatting, chat back naturally
+    - Match their energy
+    - Keep it SHORT (2-10 words)
+    - Sound like a real player, not a bot
+
+# Repetition control
+repetition:
+  max-history: 5
+  penalty-chance: 0.5
+  min-word-length: 4
+
+# Join/leave message templates
+bot_join_message: "&8[&a+&8] &f%player_name%"
+bot_leave_message: "&8[&c-&8] &f%player_name%"
+
+# Bot chat format fallback (used if QuickChat formatting is unavailable)
+bot_chat_format: "<%player_name%> %message%"

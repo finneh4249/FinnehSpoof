@@ -1,0 +1,69 @@
+# Bot population and fluctuation configuration
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# FLUCTUATION SYSTEM - Dynamic bot join/leave behavior
+# ═══════════════════════════════════════════════════════════════════════════════
+fluctuation:
+  enabled: true
+  # How often to reset join counters (seconds)
+  check-interval: 600
+  # Minimum seconds between bot joins
+  join-cooldown-seconds: 20
+  # Minimum human players needed for fluctuation to run
+  min-players-online: 0
+  # Minimum bots to keep online
+  min-online: 2
+  # Maximum bots allowed online
+  max-online: 15
+  # Maximum joins per check interval
+  max-players-per-check: 5
+  # Startup batch spawning
+  startup:
+    enabled: true
+    batch-size: 4
+    batch-delay: 40
+    batch-delay-variation: 20
+
+# Maximum number of bots active at once
+max_active_bots: 4
+
+# Target total players (humans + bots). Bots fill the gap with randomness.
+target_total_players: 50
+bot_fill_random_range: 3
+
+# Empty server population
+empty_server_min_bots: 1
+empty_server_max_bots: 3
+
+# Join/leave behavior (chance evaluated every 5 seconds)
+join_chance: 0.30
+leave_chance: 0.04
+join_catchup: 0.12
+leave_catchup: 0.10
+
+# Stagger bot joins (ticks, 20 ticks = 1 second)
+join_stagger_min_ticks: 10
+join_stagger_max_ticks: 40
+
+# Leave grace periods (seconds)
+leave_grace_after_join_seconds: 30
+leave_grace_after_chat_seconds: 60
+
+# Spawn control
+spawn_min_distance: 20
+spawn_max_distance: 60
+spawn_attempts: 12
+
+# Terrain safety (max height change allowed around target)
+cliff_max_drop: 3
+
+# Session length bounds (seconds)
+min_session_seconds: 420
+max_session_seconds: 1500
+
+# Minimum cooldown after a bot leaves before it can rejoin (seconds)
+session_cooldown_seconds: 120
+
+# Random walking behavior
+walk_radius: 10
+walk_interval_seconds: 10

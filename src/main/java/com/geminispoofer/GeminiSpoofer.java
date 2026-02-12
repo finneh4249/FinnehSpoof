@@ -28,6 +28,13 @@ public class GeminiSpoofer extends JavaPlugin {
     private BotSessionManager botSessionManager;
     private TopicSummarizer topicSummarizer;
     private ConversationSeeder conversationSeeder;
+    private static final String[] EXTRA_CONFIG_FILES = {
+        "llm.yml",
+        "chat.yml",
+        "fluctuation.yml",
+        "greetings.yml",
+        "typo.yml"
+    };
 
     /**
      * Called when the plugin is enabled. Initializes the database and registers the ChatListener event.
@@ -91,7 +98,6 @@ public class GeminiSpoofer extends JavaPlugin {
 
     public void reloadPlugin() {
         ensureConfig();
-        reloadConfig();
         llmClient = createLlmClient();
         if (personaManager != null) {
             personaManager.loadPersonalities();
@@ -106,22 +112,146 @@ public class GeminiSpoofer extends JavaPlugin {
 
     private void ensureConfig() {
         saveDefaultConfig();
+        migrateSplitConfigs();
+        reloadConfig();
+        mergeExtraConfigs();
+    }
+
+    private void migrateSplitConfigs() {
+        java.io.File dataFolder = getDataFolder();
+        java.io.File baseFile = new java.io.File(dataFolder, "config.yml");
+        org.bukkit.configuration.file.YamlConfiguration base = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(baseFile);
+
+        applyDefaults(base, "config.yml");
+
+        List<String> llmKeys = List.of(
+            "api_key",
+            "gemini_api_key",
+            "llm_provider",
+            "gemini_model",
+            "openai_api_key",
+            "openai_model",
+            "openrouter_api_key",
+            "openrouter_model",
+            "openrouter_referer",
+            "openrouter_title",
+            "anthropic_api_key",
+            "anthropic_model",
+            "anthropic_max_tokens"
+        );
+        List<String> chatKeys = List.of(
+            "conversation-seeder",
+            "chat_base_chance",
+            "chat_max_chance",
+            "chat_heat_decay",
+            "chat_heat_human_increase",
+            "chat_heat_bot_decrease",
+            "chat_dead_server_multiplier",
+            "bot_response_cooldown_seconds",
+            "chat_typing_base_delay",
+            "chat_typing_ticks_per_char",
+            "chat_typing_variation",
+            "trigger",
+            "deep-thinking",
+            "repetition",
+            "bot_join_message",
+            "bot_leave_message",
+            "bot_chat_format"
+        );
+        List<String> fluctuationKeys = List.of(
+            "fluctuation",
+            "max_active_bots",
+            "target_total_players",
+            "bot_fill_random_range",
+            "empty_server_min_bots",
+            "empty_server_max_bots",
+            "join_chance",
+            "leave_chance",
+            "join_catchup",
+            "leave_catchup",
+            "join_stagger_min_ticks",
+            "join_stagger_max_ticks",
+            "leave_grace_after_join_seconds",
+            "leave_grace_after_chat_seconds",
+            "spawn_min_distance",
+            "spawn_max_distance",
+            "spawn_attempts",
+            "cliff_max_drop",
+            "min_session_seconds",
+            "max_session_seconds",
+            "session_cooldown_seconds",
+            "walk_radius",
+            "walk_interval_seconds"
+        );
+        List<String> greetingsKeys = List.of("greeting");
+        List<String> typoKeys = List.of("typo-simulation");
+
+        migrateConfigFile("llm.yml", base, llmKeys);
+        migrateConfigFile("chat.yml", base, chatKeys);
+        migrateConfigFile("fluctuation.yml", base, fluctuationKeys);
+        migrateConfigFile("greetings.yml", base, greetingsKeys);
+        migrateConfigFile("typo.yml", base, typoKeys);
+
         try {
-            java.io.File file = new java.io.File(getDataFolder(), "config.yml");
-            org.bukkit.configuration.file.YamlConfiguration current = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(file);
-            if (getResource("config.yml") != null) {
-                try (java.io.InputStreamReader reader = new java.io.InputStreamReader(getResource("config.yml"), java.nio.charset.StandardCharsets.UTF_8)) {
-                    org.bukkit.configuration.file.YamlConfiguration defaults = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(reader);
-                    current.setDefaults(defaults);
-                    current.options().copyDefaults(true);
-                    current.options().copyHeader(true);
-                    current.save(file);
-                }
-            }
+            base.options().copyDefaults(true);
+            base.options().copyHeader(true);
+            base.save(baseFile);
         } catch (Exception exception) {
             getLogger().warning("Failed to migrate config.yml: " + exception.getMessage());
         }
-        reloadConfig();
+    }
+
+    private void migrateConfigFile(String fileName, org.bukkit.configuration.file.YamlConfiguration base, List<String> keys) {
+        java.io.File file = new java.io.File(getDataFolder(), fileName);
+        if (!file.exists()) {
+            saveResource(fileName, false);
+        }
+        org.bukkit.configuration.file.YamlConfiguration target = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(file);
+        applyDefaults(target, fileName);
+
+        boolean changed = false;
+        for (String key : keys) {
+            if (base.contains(key)) {
+                target.set(key, base.get(key));
+                base.set(key, null);
+                changed = true;
+            }
+        }
+
+        try {
+            target.options().copyDefaults(true);
+            target.options().copyHeader(true);
+            target.save(file);
+        } catch (Exception exception) {
+            getLogger().warning("Failed to save " + fileName + ": " + exception.getMessage());
+        }
+    }
+
+    private void applyDefaults(org.bukkit.configuration.file.YamlConfiguration config, String resourceName) {
+        if (getResource(resourceName) == null) {
+            return;
+        }
+        try (java.io.InputStreamReader reader = new java.io.InputStreamReader(getResource(resourceName), java.nio.charset.StandardCharsets.UTF_8)) {
+            org.bukkit.configuration.file.YamlConfiguration defaults = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(reader);
+            config.setDefaults(defaults);
+            config.options().copyDefaults(true);
+            config.options().copyHeader(true);
+        } catch (Exception exception) {
+            getLogger().warning("Failed to apply defaults for " + resourceName + ": " + exception.getMessage());
+        }
+    }
+
+    private void mergeExtraConfigs() {
+        for (String fileName : EXTRA_CONFIG_FILES) {
+            java.io.File file = new java.io.File(getDataFolder(), fileName);
+            if (!file.exists()) {
+                continue;
+            }
+            org.bukkit.configuration.file.YamlConfiguration extra = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(file);
+            for (String key : extra.getKeys(true)) {
+                getConfig().set(key, extra.get(key));
+            }
+        }
     }
 
     public double getActivityMultiplier() {

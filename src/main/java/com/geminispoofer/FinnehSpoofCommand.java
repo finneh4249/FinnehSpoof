@@ -15,15 +15,20 @@ public class FinnehSpoofCommand implements CommandExecutor {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         String prefix = "§r✦ §d§lғɪɴɴᴇʜ§5§lꜱᴘᴏᴏꜰ §7• §f";
-        String usage = "§r✦ §d§lᴜꜱᴀɢᴇ §7• §f/" + label + " <reload|enable|disable>";
+        String usage = "§r✦ §d§lᴜꜱᴀɢᴇ §7• §f/" + label + " <help|reload|enable|disable>";
         if (args.length == 0) {
-            sender.sendMessage(usage);
+            sendHelp(sender, label, prefix, usage);
+            return true;
+        }
+
+        if (args[0].equalsIgnoreCase("help") || args[0].equalsIgnoreCase("?")) {
+            sendHelp(sender, label, prefix, usage);
             return true;
         }
 
         if (args[0].equalsIgnoreCase("reload")) {
             plugin.reloadPlugin();
-            sender.sendMessage(prefix + "ʀᴇʟᴏᴀᴅᴇᴅ ᴘʟᴜɢɪɴ.");
+            sender.sendMessage(prefix + "ʀᴇʟᴏᴀᴅᴇᴅ ᴄᴏɴꜰɪɢꜱ + ᴘᴇʀꜱᴏɴᴀꜱ.");
             return true;
         }
 
@@ -41,5 +46,13 @@ public class FinnehSpoofCommand implements CommandExecutor {
 
         sender.sendMessage(usage);
         return true;
+    }
+
+    private void sendHelp(CommandSender sender, String label, String prefix, String usage) {
+        sender.sendMessage(usage);
+        sender.sendMessage(prefix + "§7/" + label + " reload §f- reload configs + personalities");
+        sender.sendMessage(prefix + "§7/" + label + " enable §f- enable bot responses");
+        sender.sendMessage(prefix + "§7/" + label + " disable §f- disable bot responses");
+        sender.sendMessage(prefix + "§7Config files: §fconfig.yml, llm.yml, chat.yml, fluctuation.yml, greetings.yml, typo.yml");
     }
 }

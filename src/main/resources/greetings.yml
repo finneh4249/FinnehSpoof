@@ -1,0 +1,9 @@
+# Join greeting configuration
+
+greeting:
+  enabled: true
+  human-join-chance: 0.05
+  bot-join-chance: 0.01
+  delay-min-ticks: 200
+  delay-max-ticks: 600
+  affects-heat: false

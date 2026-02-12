@@ -1,0 +1,26 @@
+# LLM provider configuration
+
+# Provide your Google Gemini API key below.
+api_key: ""
+gemini_api_key: ""
+
+# LLM provider selection: gemini | openai | openrouter | anthropic
+llm_provider: "gemini"
+
+# Gemini model selection (e.g., gemini-2.0-flash-exp, gemini-1.5-flash, gemini-flash-lite-latest)
+gemini_model: "gemini-2.0-flash-exp"
+
+# OpenAI settings
+openai_api_key: ""
+openai_model: "gpt-4o-mini"
+
+# OpenRouter settings
+openrouter_api_key: ""
+openrouter_model: "openai/gpt-4o-mini"
+openrouter_referer: ""
+openrouter_title: "FinnehSpoof"
+
+# Anthropic settings
+anthropic_api_key: ""
+anthropic_model: "claude-3-5-haiku-20241022"
+anthropic_max_tokens: 200
