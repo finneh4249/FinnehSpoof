@@ -70,13 +70,15 @@ public class RelationshipManager {
                         int relId = db.upsertRelationship(senderName, senderType, other, otherType, PASSIVE_WEIGHT);
 
                         // Active: direct name mention
+                        double totalWeight = PASSIVE_WEIGHT;
                         if (message != null && message.toLowerCase().contains(other.toLowerCase())) {
                             db.upsertRelationship(senderName, senderType, other, otherType, MENTION_WEIGHT);
+                            totalWeight += MENTION_WEIGHT;
                         }
 
                         // Check thresholds for topic extraction and summarization
                         if (relId > 0) {
-                            checkThresholds(senderName, other, relId);
+                            checkThresholds(senderName, other, relId, totalWeight);
                         }
                     }
                 } catch (SQLException e) {
@@ -88,22 +90,32 @@ public class RelationshipManager {
 
     /**
      * Checks if interaction thresholds are met for topic extraction or summarization.
+     * Uses the weight that was just added to determine if we crossed a threshold.
      */
-    private void checkThresholds(String entityA, String entityB, int relationshipId) throws SQLException {
+    private void checkThresholds(String entityA, String entityB, int relationshipId, double addedWeight) throws SQLException {
         FileConfiguration config = plugin.getConfig();
         int topicThreshold = config.getInt("relationship-memory.topic-extract-after-interactions", 20);
         int summaryThreshold = config.getInt("relationship-memory.summarize-after-interactions", 50);
 
-        int count = db.getInteractionCount(entityA, entityB);
+        double currentCount = db.getInteractionCount(entityA, entityB);
+        double previousCount = currentCount - addedWeight;
 
-        // Topic extraction at threshold intervals
-        if (topicThreshold > 0 && count > 0 && count % topicThreshold == 0) {
-            extractTopicsAsync(entityA, entityB, relationshipId);
+        // Topic extraction when crossing threshold boundaries
+        if (topicThreshold > 0) {
+            int prevFloor = (int) Math.floor(previousCount / topicThreshold);
+            int currFloor = (int) Math.floor(currentCount / topicThreshold);
+            if (currFloor > prevFloor) {
+                extractTopicsAsync(entityA, entityB, relationshipId);
+            }
         }
 
-        // Summarization at threshold intervals
-        if (summaryThreshold > 0 && count > 0 && count % summaryThreshold == 0) {
-            summarizeRelationshipAsync(entityA, entityB, relationshipId);
+        // Summarization when crossing threshold boundaries
+        if (summaryThreshold > 0) {
+            int prevFloor = (int) Math.floor(previousCount / summaryThreshold);
+            int currFloor = (int) Math.floor(currentCount / summaryThreshold);
+            if (currFloor > prevFloor) {
+                summarizeRelationshipAsync(entityA, entityB, relationshipId);
+            }
         }
     }
 
@@ -187,7 +199,7 @@ public class RelationshipManager {
                     sentenceCount++;
                 } else if (row.interactionCount() > 10) {
                     contextBuilder.append("You've interacted with ").append(other)
-                        .append(" ").append(row.interactionCount()).append(" times before. ");
+                        .append(" ").append((int) row.interactionCount()).append(" times before. ");
                     sentenceCount++;
                 }
             }
@@ -367,7 +379,7 @@ public class RelationshipManager {
                     String sentimentColor = row.sentiment() >= 0 ? "§a" : "§c";
                     lines.add("  §7• §f" + other + " §7[" + sentimentColor +
                         String.format("%.1f", row.sentiment()) + "§7] §7interactions: §f" +
-                        row.interactionCount());
+                        String.format("%.1f", row.interactionCount()));
 
                     List<String> topics = db.getTopics(row.id());
                     if (!topics.isEmpty()) {
