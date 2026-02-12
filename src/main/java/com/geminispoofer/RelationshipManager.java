@@ -56,30 +56,33 @@ public class RelationshipManager {
         if (!isEnabled()) return;
         if (senderName == null || senderName.isBlank()) return;
 
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            try {
-                List<String> onlineEntities = getOnlineEntityNames();
-                onlineEntities.remove(senderName.toLowerCase());
+        // Collect Bukkit-based entity data on the main thread, then process DB updates asynchronously.
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            List<String> onlineEntities = getOnlineEntityNames();
+            onlineEntities.remove(senderName.toLowerCase());
 
-                for (String other : onlineEntities) {
-                    String otherType = plugin.isBotActive(other) ? "bot" : "human";
+            Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+                try {
+                    for (String other : onlineEntities) {
+                        String otherType = plugin.isBotActive(other) ? "bot" : "human";
 
-                    // Passive: just being online together
-                    int relId = db.upsertRelationship(senderName, senderType, other, otherType, PASSIVE_WEIGHT);
+                        // Passive: just being online together
+                        int relId = db.upsertRelationship(senderName, senderType, other, otherType, PASSIVE_WEIGHT);
 
-                    // Active: direct name mention
-                    if (message != null && message.toLowerCase().contains(other.toLowerCase())) {
-                        db.upsertRelationship(senderName, senderType, other, otherType, MENTION_WEIGHT);
+                        // Active: direct name mention
+                        if (message != null && message.toLowerCase().contains(other.toLowerCase())) {
+                            db.upsertRelationship(senderName, senderType, other, otherType, MENTION_WEIGHT);
+                        }
+
+                        // Check thresholds for topic extraction and summarization
+                        if (relId > 0) {
+                            checkThresholds(senderName, other, relId);
+                        }
                     }
-
-                    // Check thresholds for topic extraction and summarization
-                    if (relId > 0) {
-                        checkThresholds(senderName, other, relId);
-                    }
+                } catch (SQLException e) {
+                    logger.warning("[RelationshipManager] Failed to process message: " + e.getMessage());
                 }
-            } catch (SQLException e) {
-                logger.warning("[RelationshipManager] Failed to process message: " + e.getMessage());
-            }
+            });
         });
     }
 
