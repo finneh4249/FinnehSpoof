@@ -10,7 +10,9 @@ import org.bukkit.entity.Player;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -60,11 +62,14 @@ public class RelationshipManager {
         Bukkit.getScheduler().runTask(plugin, () -> {
             List<String> onlineEntities = getOnlineEntityNames();
             onlineEntities.remove(senderName.toLowerCase());
+            
+            // Build a Set of bot names once to avoid per-entity sync calls
+            Set<String> botNames = getBotNames();
 
             Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
                 try {
                     for (String other : onlineEntities) {
-                        String otherType = plugin.isBotActive(other) ? "bot" : "human";
+                        String otherType = botNames.contains(other) ? "bot" : "human";
 
                         // Passive: just being online together
                         int relId = db.upsertRelationship(senderName, senderType, other, otherType, PASSIVE_WEIGHT);
@@ -428,6 +433,23 @@ public class RelationshipManager {
             }
         }
         return names;
+    }
+
+    /**
+     * Gets a Set of all active bot names (lowercase).
+     * Must be called from the main thread.
+     */
+    private Set<String> getBotNames() {
+        Set<String> botNames = new HashSet<>();
+        if (plugin.getBotCount() > 0) {
+            BotManager botManager = plugin.getBotManager();
+            if (botManager != null) {
+                for (FakePlayer bot : botManager.getAllBots()) {
+                    botNames.add(bot.getName().toLowerCase());
+                }
+            }
+        }
+        return botNames;
     }
 
     /**
