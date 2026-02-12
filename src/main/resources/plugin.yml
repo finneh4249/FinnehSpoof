@@ -1,0 +1,14 @@
+name: FinnehSpoof
+main: com.geminispoofer.GeminiSpoofer
+version: 0.2.0
+api-version: "1.20"
+depend: [ProtocolLib, FinnehCore]
+softdepend: [PlaceholderAPI]
+commands:
+  finnehspoof:
+    description: FinnehSpoof control command.
+    usage: "/finnehspoof reload"
+permissions:
+  geminispoofer.ignore:
+    description: Ignore chat logging for this player.
+    default: false
