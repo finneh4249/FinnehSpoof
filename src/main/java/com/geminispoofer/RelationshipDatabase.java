@@ -34,10 +34,13 @@ public class RelationshipDatabase {
      */
     public void init(String dbPath) throws SQLException {
         Path path = Path.of(dbPath);
-        try {
-            Files.createDirectories(path.getParent());
-        } catch (Exception e) {
-            throw new SQLException("Failed to create database directory for relationships", e);
+        Path parent = path.getParent();
+        if (parent != null) {
+            try {
+                Files.createDirectories(parent);
+            } catch (Exception e) {
+                throw new SQLException("Failed to create database directory for relationships", e);
+            }
         }
 
         connection = DriverManager.getConnection("jdbc:sqlite:" + path);
