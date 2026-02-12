@@ -125,14 +125,24 @@ public class DirectorTask extends BukkitRunnable {
                     // Build relationship context for present entities
                     String relationshipCtx = "";
                     if (relationshipManager != null) {
-                        List<String> presentEntities = new ArrayList<>();
-                        for (Player p : Bukkit.getOnlinePlayers()) {
-                            presentEntities.add(p.getName());
-                        }
-                        for (FakePlayer b : botManager.getAllBots()) {
-                            if (!b.getName().equalsIgnoreCase(bot.getName())) {
-                                presentEntities.add(b.getName());
-                            }
+                        List<String> presentEntities;
+                        try {
+                            // Gather Bukkit/Citizens state safely on the main thread
+                            presentEntities = Bukkit.getScheduler().callSyncMethod(database, () -> {
+                                List<String> entities = new ArrayList<>();
+                                for (Player p : Bukkit.getOnlinePlayers()) {
+                                    entities.add(p.getName());
+                                }
+                                for (FakePlayer b : botManager.getAllBots()) {
+                                    if (!b.getName().equalsIgnoreCase(bot.getName())) {
+                                        entities.add(b.getName());
+                                    }
+                                }
+                                return entities;
+                            }).get();
+                        } catch (Exception e) {
+                            debug("Failed to gather present entities for relationship context: " + e.getMessage());
+                            presentEntities = new ArrayList<>();
                         }
                         RelationshipContext relCtx = relationshipManager.getRelationshipContext(bot.getName(), presentEntities);
                         relationshipCtx = relCtx.formattedContext();
