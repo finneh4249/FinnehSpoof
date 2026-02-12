@@ -28,12 +28,16 @@ public class GeminiSpoofer extends JavaPlugin {
     private BotSessionManager botSessionManager;
     private TopicSummarizer topicSummarizer;
     private ConversationSeeder conversationSeeder;
+    private RelationshipManager relationshipManager;
+    private RelationshipDatabase relationshipDatabase;
+    private int decayTaskId = -1;
     private static final String[] EXTRA_CONFIG_FILES = {
         "llm.yml",
         "chat.yml",
         "fluctuation.yml",
         "greetings.yml",
-        "typo.yml"
+        "typo.yml",
+        "relationship-memory.yml"
     };
 
     /**
@@ -57,9 +61,11 @@ public class GeminiSpoofer extends JavaPlugin {
         botActor = new BotActor(this, this);
         topicSummarizer = new TopicSummarizer(this, llmClient);
         conversationSeeder = new ConversationSeeder(this, llmClient, topicSummarizer, botManager, botActor);
+        initRelationshipManager();
         personaManager.loadPersonalities();
         startSessionManager();
         startDirectorTask();
+        scheduleRelationshipDecay();
 
         getServer().getPluginManager().registerEvents(new ChatListener(this), this);
         PaperChatListener.register(this);
@@ -81,8 +87,12 @@ public class GeminiSpoofer extends JavaPlugin {
     public void onDisable() {
         stopDirectorTask();
         stopSessionManager();
+        cancelRelationshipDecay();
         if (botManager != null) {
             botManager.despawnAll();
+        }
+        if (relationshipDatabase != null) {
+            relationshipDatabase.close();
         }
         if (connection == null) {
             return;
@@ -104,6 +114,7 @@ public class GeminiSpoofer extends JavaPlugin {
         }
         topicSummarizer = new TopicSummarizer(this, llmClient);
         conversationSeeder = new ConversationSeeder(this, llmClient, topicSummarizer, botManager, botActor);
+        initRelationshipManager();
         if (botSessionManager != null) {
             botSessionManager.resetState();
         }
@@ -185,12 +196,14 @@ public class GeminiSpoofer extends JavaPlugin {
         );
         List<String> greetingsKeys = List.of("greeting");
         List<String> typoKeys = List.of("typo-simulation");
+        List<String> relationshipKeys = List.of("relationship-memory");
 
         migrateConfigFile("llm.yml", base, llmKeys);
         migrateConfigFile("chat.yml", base, chatKeys);
         migrateConfigFile("fluctuation.yml", base, fluctuationKeys);
         migrateConfigFile("greetings.yml", base, greetingsKeys);
         migrateConfigFile("typo.yml", base, typoKeys);
+        migrateConfigFile("relationship-memory.yml", base, relationshipKeys);
 
         try {
             base.options().copyDefaults(true);
@@ -413,7 +426,7 @@ public class GeminiSpoofer extends JavaPlugin {
             return;
         }
         int contextLines = getConfig().getInt("context_lines", 15);
-        directorTask = new DirectorTask(this, personaManager, llmClient, botActor, botManager, conversationSeeder, contextLines);
+        directorTask = new DirectorTask(this, personaManager, llmClient, botActor, botManager, conversationSeeder, relationshipManager, contextLines);
         directorTask.runTaskTimer(this, 100L, 100L);
     }
 
@@ -460,6 +473,53 @@ public class GeminiSpoofer extends JavaPlugin {
         startSessionManager();
     }
 
+    // ── Relationship Manager ─────────────────────────────────────────────
+
+    private void initRelationshipManager() {
+        if (!getConfig().getBoolean("relationship-memory.enabled", false)) {
+            relationshipManager = null;
+            relationshipDatabase = null;
+            return;
+        }
+        try {
+            String dbPath = getConfig().getString("relationship-memory.db-path", "plugins/FinnehSpoof/relationships.db");
+            relationshipDatabase = new RelationshipDatabase(getLogger());
+            relationshipDatabase.init(dbPath);
+            relationshipManager = new RelationshipManager(this, relationshipDatabase, llmClient);
+            getLogger().info("Relationship memory system enabled.");
+        } catch (java.sql.SQLException e) {
+            getLogger().severe("Failed to initialize relationship database: " + e.getMessage());
+            relationshipManager = null;
+            relationshipDatabase = null;
+        }
+    }
+
+    private void scheduleRelationshipDecay() {
+        if (relationshipManager == null) return;
+        // Run decay once every 24 hours (24 * 60 * 60 * 20 ticks)
+        long dayTicks = 24L * 60 * 60 * 20;
+        decayTaskId = Bukkit.getScheduler().runTaskTimer(this, () -> {
+            if (relationshipManager != null) {
+                relationshipManager.decayStaleRelationships();
+            }
+        }, dayTicks, dayTicks).getTaskId();
+    }
+
+    private void cancelRelationshipDecay() {
+        if (decayTaskId >= 0) {
+            Bukkit.getScheduler().cancelTask(decayTaskId);
+            decayTaskId = -1;
+        }
+    }
+
+    public RelationshipManager getRelationshipManager() {
+        return relationshipManager;
+    }
+
+    public BotManager getBotManager() {
+        return botManager;
+    }
+
     /**
      * Asynchronously logs a message to the database.
      * 
@@ -484,6 +544,10 @@ public class GeminiSpoofer extends JavaPlugin {
                         conversationSeeder.onMessageLogged();
                     }
                 });
+                // Feed message to relationship system
+                if (relationshipManager != null) {
+                    relationshipManager.processMessage(sender, senderType, message);
+                }
                 future.complete(null);
             } catch (SQLException exception) {
                 getLogger().warning("Failed to log message: " + exception.getMessage());

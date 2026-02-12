@@ -70,7 +70,12 @@ public class BotSessionManager extends BukkitRunnable {
         }
         
         int maxActive = plugin.getConfig().getInt("max_active_bots", 4);
-        int minOnline = plugin.getConfig().getInt("fluctuation.min-online", 2);
+        int minOnline;
+        if (plugin.getConfig().getBoolean("dead-server-cycling.enabled", false)) {
+             minOnline = plugin.getConfig().getInt("dead-server-cycling.min-bots-online", 1);
+        } else {
+             minOnline = plugin.getConfig().getInt("fluctuation.min-online", 2);
+        }
         int maxOnline = plugin.getConfig().getInt("fluctuation.max-online", 15);
         int maxPerCheck = plugin.getConfig().getInt("fluctuation.max-players-per-check", 1);
         
@@ -79,7 +84,14 @@ public class BotSessionManager extends BukkitRunnable {
         int emptyMin = plugin.getConfig().getInt("empty_server_min_bots", 1);
         int emptyMax = plugin.getConfig().getInt("empty_server_max_bots", 3);
         int minSession = plugin.getConfig().getInt("min_session_seconds", 120);
-        int maxSession = plugin.getConfig().getInt("max_session_seconds", 420);
+        int maxSession;
+        if (plugin.getConfig().getBoolean("dead-server-cycling.enabled", false) && humanCount == 0) {
+            maxSession = plugin.getConfig().getInt("dead-server-cycling.dead-server-max-session-seconds", 600);
+        } else if (plugin.getConfig().getBoolean("dead-server-cycling.enabled", false)) {
+            maxSession = plugin.getConfig().getInt("dead-server-cycling.normal-max-session-seconds", 1500);
+        } else {
+            maxSession = plugin.getConfig().getInt("max_session_seconds", 420);
+        }
         double joinChance = plugin.getConfig().getDouble("join_chance", 0.35);
         double leaveChance = plugin.getConfig().getDouble("leave_chance", 0.10);
         double joinCatchup = plugin.getConfig().getDouble("join_catchup", 0.15);
@@ -271,25 +283,56 @@ public class BotSessionManager extends BukkitRunnable {
     }
 
     private void handleLeaves(long now, double leaveChance, int minOnline, int minSessionSeconds) {
-        int joinGraceSeconds = plugin.getConfig().getInt("leave_grace_after_join_seconds", 30);
-        int chatGraceSeconds = plugin.getConfig().getInt("leave_grace_after_chat_seconds", 60);
         for (Map.Entry<String, BotSession> entry : new ArrayList<>(sessions.entrySet())) {
             String name = entry.getKey();
             BotSession session = entry.getValue();
-            if (sessions.size() <= minOnline) {
-                break;
-            }
-            if (joinGraceSeconds > 0 && now < session.startAt + (joinGraceSeconds * 1000L)) {
-                continue;
-            }
-            if (chatGraceSeconds > 0 && session.lastChatAt > 0 && now < session.lastChatAt + (chatGraceSeconds * 1000L)) {
-                continue;
-            }
-            boolean minSessionElapsed = minSessionSeconds <= 0 || now >= session.startAt + (minSessionSeconds * 1000L);
-            if (now >= session.endAt || (minSessionElapsed && ThreadLocalRandom.current().nextDouble() < leaveChance)) {
+            
+            // Should this bot leave?
+            if (shouldLeave(session, now, leaveChance, minOnline, minSessionSeconds)) {
                 leave(name, false);
             }
         }
+    }
+
+    private boolean shouldLeave(BotSession session, long now, double leaveChance, int minOnline, int minSessionSeconds) {
+        // 1. Maintain minimum bots online (unless hard cap? No, keeps min bots is priority usually, 
+        // but if hard cap is reached we might cycle them.
+        // For now, let's respect minOnline only if we are voluntarily leaving, but hard cap should probably force cycle...
+        // Actually the user requirement says "Min bots online floor maintained".
+        // So if we are at minOnline, we shouldn't leave unless we have a replacement ready? 
+        // The simple logic is: don't leave if <= minOnline. 
+        // But if a bot hits hard cap, it MUST leave? 
+        // If it leaves, the next tick handleFluctuationJoins will see the deficit and spawn a new one.
+        // So hard cap should override minOnline to ensure cycling.
+        // However, to prevent empty server flickering, maybe we should be careful.
+        // User request: "Bots drift in and out... Server never looks completely dead (floor maintained)"
+        // If we force leave at hard cap, there might be a gap.
+        // But "New personas cycle in to replace departed ones" implies a gap is acceptable or expected.
+        // Let's strictly follow the "Hard cap: session exceeded max duration → always leave" rule from the prompt.
+        
+        boolean hardCapEnabled = plugin.getConfig().getBoolean("dead-server-cycling.hard-session-cap", false);
+        if (hardCapEnabled && now >= session.endAt) {
+            return true; // Hard exit, no grace period check, overrides minOnline (cycling)
+        }
+
+        // If we are below minOnline, don't leave voluntarily
+        if (sessions.size() <= minOnline) {
+             return false;
+        }
+
+        // Soft leave checks
+        int joinGraceSeconds = plugin.getConfig().getInt("leave_grace_after_join_seconds", 30);
+        int chatGraceSeconds = plugin.getConfig().getInt("leave_grace_after_chat_seconds", 60);
+
+        if (joinGraceSeconds > 0 && now < session.startAt + (joinGraceSeconds * 1000L)) {
+            return false;
+        }
+        if (chatGraceSeconds > 0 && session.lastChatAt > 0 && now < session.lastChatAt + (chatGraceSeconds * 1000L)) {
+            return false;
+        }
+        
+        boolean minSessionElapsed = minSessionSeconds <= 0 || now >= session.startAt + (minSessionSeconds * 1000L);
+        return minSessionElapsed && ThreadLocalRandom.current().nextDouble() < leaveChance;
     }
 
     public void markChat(String botName) {

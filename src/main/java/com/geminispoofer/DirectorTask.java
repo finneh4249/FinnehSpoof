@@ -3,6 +3,8 @@ package com.geminispoofer;
 import org.bukkit.Bukkit;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import org.bukkit.entity.Player;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -15,6 +17,7 @@ public class DirectorTask extends BukkitRunnable {
     private final BotActor botActor;
     private final BotManager botManager;
     private final ConversationSeeder conversationSeeder;
+    private final RelationshipManager relationshipManager;
     private final int contextLines;
 
     private long lastTalkTime = 0L;
@@ -27,6 +30,7 @@ public class DirectorTask extends BukkitRunnable {
                         BotActor botActor,
                         BotManager botManager,
                         ConversationSeeder conversationSeeder,
+                        RelationshipManager relationshipManager,
                         int contextLines) {
         this.database = database;
         this.personaManager = personaManager;
@@ -34,6 +38,7 @@ public class DirectorTask extends BukkitRunnable {
         this.botActor = botActor;
         this.botManager = botManager;
         this.conversationSeeder = conversationSeeder;
+        this.relationshipManager = relationshipManager;
         this.contextLines = contextLines;
     }
 
@@ -114,8 +119,35 @@ public class DirectorTask extends BukkitRunnable {
                     );
 
                     Persona persona = personaManager.getPersona(bot.getName());
-                    String prompt = persona != null ? persona.systemPrompt() : "";
+                    String personaPrompt = persona != null ? persona.systemPrompt() : "";
                     String contextStr = data.context();
+
+                    // Build relationship context for present entities
+                    String relationshipCtx = "";
+                    if (relationshipManager != null) {
+                        List<String> presentEntities;
+                        try {
+                            // Gather Bukkit/Citizens state safely on the main thread
+                            presentEntities = Bukkit.getScheduler().callSyncMethod(database, () -> {
+                                List<String> entities = new ArrayList<>();
+                                for (Player p : Bukkit.getOnlinePlayers()) {
+                                    entities.add(p.getName());
+                                }
+                                for (FakePlayer b : botManager.getAllBots()) {
+                                    if (!b.getName().equalsIgnoreCase(bot.getName())) {
+                                        entities.add(b.getName());
+                                    }
+                                }
+                                return entities;
+                            }).get();
+                        } catch (Exception e) {
+                            debug("Failed to gather present entities for relationship context: " + e.getMessage());
+                            presentEntities = new ArrayList<>();
+                        }
+                        RelationshipContext relCtx = relationshipManager.getRelationshipContext(bot.getName(), presentEntities);
+                        relationshipCtx = relCtx.formattedContext();
+                    }
+                    String prompt = PromptBuilder.buildSystemPrompt(personaPrompt, relationshipCtx);
                     boolean deepThinkingEnabled = database.getConfig().getBoolean("deep-thinking.enabled", true);
                     long recentWindowSeconds = database.getConfig().getLong("deep-thinking.recent-human-seconds", 30);
                     long recentWindowMs = Math.max(0L, recentWindowSeconds) * 1000L;
@@ -131,7 +163,8 @@ public class DirectorTask extends BukkitRunnable {
                     }
                     debug("Calling LLM for bot: " + bot.getName() + ", context length: " + contextStr.length() + ", joinedAt: " + botJoinedAt);
 
-                    return llmClient.generateReplyAsync(prompt, contextStr)
+                    String finalPrompt = prompt;
+                    return llmClient.generateReplyAsync(finalPrompt, contextStr)
                         .thenApply(response -> {
                             if (response == null || response.isBlank()) {
                                 debug("LLM returned null/empty response for bot: " + bot.getName());

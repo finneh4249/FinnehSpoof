@@ -67,3 +67,20 @@ session_cooldown_seconds: 120
 # Random walking behavior
 walk_radius: 10
 walk_interval_seconds: 10
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# DEAD SERVER CYCLING - Ensuring bots leave/rejoin when no humans online
+# ═══════════════════════════════════════════════════════════════════════════════
+dead-server-cycling:
+  enabled: true
+  
+  # Force session end after max duration regardless of activity
+  # This overrides leave_grace_after_chat
+  hard-session-cap: true
+  
+  # When no humans online, reduce max session length
+  dead-server-max-session-seconds: 600   # 10 mins max when empty
+  normal-max-session-seconds: 1500       # 25 mins when populated
+  
+  # Minimum bots always online
+  min-bots-online: 1

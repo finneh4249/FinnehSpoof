@@ -5,11 +5,19 @@ public final class PromptBuilder {
     }
 
     public static String buildSystemPrompt(String personaPrompt) {
+        return buildSystemPrompt(personaPrompt, null);
+    }
+
+    public static String buildSystemPrompt(String personaPrompt, String relationshipContext) {
         String context = personaPrompt == null ? "" : personaPrompt.trim();
         if (!context.isEmpty()) {
             context = " Context: " + context + ".";
         }
-        return "You are a Minecraft player." + context
+        String relContext = "";
+        if (relationshipContext != null && !relationshipContext.isBlank()) {
+            relContext = "\nWhat you know about people here:\n" + relationshipContext.trim() + "\n";
+        }
+        return "You are a Minecraft player." + context + relContext
             + " Speak like a normal player: friendly, casual, and natural. Keep replies concise (often 2-12 words, 1 sentence)."
             + " Prefer 1-2 parallel threads at most; you can switch between them without replying linearly."
             + " Rarely, you may say something that feels like shouting into the void, but make that uncommon."

@@ -44,6 +44,27 @@ public class FinnehSpoofCommand implements CommandExecutor {
             return true;
         }
 
+        if (args[0].equalsIgnoreCase("relationships") || args[0].equalsIgnoreCase("rels")) {
+            if (args.length < 2) {
+                sender.sendMessage(prefix + "§7Usage: §f/" + label + " relationships <player>");
+                return true;
+            }
+            RelationshipManager relManager = plugin.getRelationshipManager();
+            if (relManager == null) {
+                sender.sendMessage(prefix + "§cRelationship memory is disabled.");
+                return true;
+            }
+            String target = args[1];
+            relManager.getRelationshipInfo(target).thenAccept(lines -> {
+                org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
+                    for (String line : lines) {
+                        sender.sendMessage(prefix + line);
+                    }
+                });
+            });
+            return true;
+        }
+
         sender.sendMessage(usage);
         return true;
     }
@@ -53,6 +74,7 @@ public class FinnehSpoofCommand implements CommandExecutor {
         sender.sendMessage(prefix + "§7/" + label + " reload §f- reload configs + personalities");
         sender.sendMessage(prefix + "§7/" + label + " enable §f- enable bot responses");
         sender.sendMessage(prefix + "§7/" + label + " disable §f- disable bot responses");
-        sender.sendMessage(prefix + "§7Config files: §fconfig.yml, llm.yml, chat.yml, fluctuation.yml, greetings.yml, typo.yml");
+        sender.sendMessage(prefix + "§7/" + label + " relationships <player> §f- view relationship data");
+        sender.sendMessage(prefix + "§7Config files: §fconfig.yml, llm.yml, chat.yml, fluctuation.yml, greetings.yml, typo.yml, relationship-memory.yml");
     }
 }
