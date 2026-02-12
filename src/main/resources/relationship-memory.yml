@@ -1,0 +1,51 @@
+# Relationship Memory Configuration
+
+relationship-memory:
+  # Enable/disable the relationship memory system
+  # Start disabled for safe rollout; enable after testing
+  enabled: false
+
+  # Path to the SQLite database file for relationship data
+  db-path: "plugins/FinnehSpoof/relationships.db"
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # DECAY SETTINGS - Prevent stale relationships from dominating
+  # ═══════════════════════════════════════════════════════════════════════════════
+
+  # Start decaying relationships after this many days of inactivity
+  decay-days: 30
+
+  # Reduce interaction_count by this percentage daily (0.1 = 10%)
+  decay-rate: 0.1
+
+  # Remove relationships below this interaction count after decay
+  minimum-threshold: 5
+
+  # Maximum number of topics stored per entity pair
+  max-topics-per-pair: 10
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # PROCESSING THRESHOLDS - When to extract topics and generate summaries
+  # ═══════════════════════════════════════════════════════════════════════════════
+
+  # Extract topics via LLM every N interactions between a pair
+  topic-extract-after-interactions: 20
+
+  # Generate relationship summary via LLM every N interactions
+  summarize-after-interactions: 50
+
+  # Number of recent chat lines to use for topic extraction
+  topic-context-lines: 30
+
+  # Number of recent chat lines to use for relationship summarization
+  summary-context-lines: 50
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # PROMPT INJECTION - Control how much context is added to bot prompts
+  # ═══════════════════════════════════════════════════════════════════════════════
+
+  # Maximum sentences injected per bot per message
+  max-context-sentences: 3
+
+  # Only inject context for the most relevant N entities
+  max-entities-in-context: 4
